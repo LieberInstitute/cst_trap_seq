@@ -10,6 +10,7 @@ library(TeachingDemos) # for shadow text
 library(clusterProfiler)
 library(org.Mm.eg.db)
 library(VariantAnnotation)
+library(RColorBrewer)
 
 dir.create("plots")
 dir.create("tables")
@@ -116,13 +117,29 @@ dim(sigGene)
 g = c("Cort", "Ntrk2")
 m = match(g, outGene$Symbol)
 
+
 pdf("plots/volcano_plot_mutVsWt.pdf",useDingbats=FALSE)
 palette(brewer.pal(5, "Dark2"))
 par(mar = c(5,6,2,2), cex.axis=2,cex.lab=2)
 plot(-log10(P.Value) ~ logFC, pch = 21, bg=sigColor, 
-	data = outGene, xlab = "IP vs Input log2FC")
+	data = outGene, xlab = "MUT vs WT log2FC")
 shadowtext(outGene$logFC[m], -log10(outGene$P.Value[m]),
 	letters[21:22],font=2,cex=2,col="grey")
+abline(v=c(-1,1), lty=2,lwd=2)
+dev.off()
+
+
+## volcano	again
+g2 = c("Wt1", "Calb1", "Lgals1", "Trpc6", "Syt6", "Gng4")
+m2 = match(g2, outGene$Symbol)
+
+pdf("plots/volcano_plot_validatedGenes.pdf",useDingbats=FALSE)
+palette(brewer.pal(5, "Dark2"))
+par(mar = c(5,6,2,2), cex.axis=2,cex.lab=2)
+plot(-log10(P.Value) ~ logFC, pch = 21, bg=sigColor, 
+	data = outGene, xlab = "MUT vs WT log2FC")
+shadowtext(outGene$logFC[m2], -log10(outGene$P.Value[m2]),
+	letters[21:26],font=2,cex=2,col="grey")
 abline(v=c(-1,1), lty=2,lwd=2)
 dev.off()
 
@@ -138,31 +155,51 @@ sigGeneList = lapply(sigGeneList, function(x) x[!is.na(x)])
 geneUniverse = as.character(outGene$EntrezID)
 geneUniverse = geneUniverse[!is.na(geneUniverse)]
 
-goBP <- compareCluster(sigGeneList, fun = "enrichGO",
+go<- compareCluster(sigGeneList, fun = "enrichGO",
                 universe = geneUniverse, OrgDb = org.Mm.eg.db,
-                ont = "BP", pAdjustMethod = "BH",
-                pvalueCutoff  = 0.1, qvalueCutoff  = 0.05,
+                ont = "ALL", pAdjustMethod = "BH",
+                pvalueCutoff  = 1, qvalueCutoff  = 1,
 				readable= TRUE)
-goMF <- compareCluster(sigGeneList, fun = "enrichGO",
-                universe = geneUniverse, OrgDb = org.Mm.eg.db,
-                ont = "MF", pAdjustMethod = "BH",
-                pvalueCutoff  = 0.1, qvalueCutoff  = 0.05,
-				readable= TRUE)		
-goCC <- compareCluster(sigGeneList, fun = "enrichGO",
-                universe = geneUniverse, OrgDb = org.Mm.eg.db,
-                ont = "CC", pAdjustMethod = "BH",
-                pvalueCutoff  = 0.1, qvalueCutoff  = 0.05,
-				readable= TRUE)
-
+	
 ## write out				
-goBP_DF = as.data.frame(goBP)
-goMF_DF = as.data.frame(goMF)
-goCC_DF = as.data.frame(goCC)
+goOut = as.data.frame(go)
+goSig = goOut[goOut$p.adjust < 0.05,]
+colnames(goSig)[1] = "Direction"
+goSig = goSig[order(goSig$p.adjust),]
+save(go, goOut,goSig, file = "tables/mutVsWt_GO_FDR05.rda")
+write.csv(goSig, file = "tables/mutVsWt_GO_FDR05.csv",row.names=FALSE)
 
-goOut = rbind(goBP_DF, goMF_DF, goCC_DF)
-goOut$Ontology = rep(c("BP", "MF", "CC"), 
-	times = c(nrow(goBP), nrow(goMF), nrow(goCC)))
-goOut = goOut[goOut$p.adjust < 0.05,]
-colnames(goOut)[1] = "Direction"
-goOut = goOut[order(goOut$p.adjust),]
-write.csv(goOut, file = "tables/mutVsWt_GO_FDR05.csv",row.names=FALSE)
+## plots
+goIDs = c("GO:0033267", "GO:0007409", "GO:0061564",	
+	"GO:0010976", "GO:0006816", "GO:0006874", "GO:0030003",
+	"GO:1904062", "GO:0005509", "GO:0034702")
+goPlot = goOut[goOut$ID %in% goIDs,]
+
+goExample = goPlot[!duplicated(goPlot[,c("ID", "Description")]),3:4]
+upGo = goPlot[goPlot$Cluster == 1,]
+goExample$Up = upGo$pvalue[match(goExample$ID, upGo$ID)]
+downGo = goPlot[goPlot$Cluster == -1,]
+goExample$Down = downGo$pvalue[match(goExample$ID, downGo$ID)]
+
+goExample$Description[goExample$Description == "regulation of cation transmembrane transport"] = "regulation of cation\ntransmembrane transport"
+goExample$Description[goExample$Description == "positive regulation of neuron projection development"] = "positive regulation of\nneuron projection development"
+
+goExample$Label = paste0(goExample$ID, ": ", goExample$Description)
+pdf("plots/go_barplot.pdf",h=6,w=8)
+par(mar=c(5,21.5,1,1),cex.axis=1.2,cex.lab=1.5)
+barplot(t(-log10(as.matrix(goExample[,c("Up", "Down")]))),
+	width=0.75, names = goExample$Label,
+	horiz=TRUE,xlim=c(0,8),ylim=c(0.5,23.5),
+	xlab="-log10(P-Value)",las=1,beside=TRUE, col=c("blue","red"))
+abline(v=-log10(max(goOut$pvalue[goOut$p.adj < 0.05])), col="blue")
+legend("topright", c("Mut>Wt", "Mut<Wt"), col=c("blue","red"),
+	cex=1.2,nc=1,pch=15)
+dev.off()
+	
+goSub = go
+goSub@compareClusterResult = goSub@compareClusterResult[goSub@compareClusterResult$ID %in% goIDs,]
+goSub@compareClusterResult$ONTOLOGY = NULL
+
+pdf("plots/go_dotplot.pdf")
+dotplot(goSub)
+dev.off()
