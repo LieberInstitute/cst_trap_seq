@@ -10,6 +10,7 @@ library(jaffelab)
 library(sva)
 library(RColorBrewer)
 library(TeachingDemos) # for shadow text
+library(biomaRt)
 
 ## load counts
 load("count_data/rse_gene_TrkB_CST_Cortex_n10_annotated.Rdata")
@@ -170,7 +171,7 @@ goDf = as.data.frame(go)
 goDf = goDf[order(goDf$pvalue),]
 goDf$Cluster = ifelse(goDf$Cluster == "-1", "CST<WT", "WT<CST")
 write.csv(goDf, row.names=FALSE,
-	file="tables/GOsets_hypergeo_Gene-p005.csv")
+	file="tables/bulk_genotype_GOsets_hypergeo_Gene-p005.csv")
 
 keggGseDf$Description[keggGseDf$NES > 0]
 goGseDf$Description[goGseDf$NES > 0]
@@ -181,3 +182,62 @@ goGseDf$core_enrichment = sapply(goGseDf$core_enrichment,paste,collapse=";")
 write.table(keggGseDf, file ="tables/KEGG_gsea.tsv",
 	sep="\t",row.names=FALSE)
 write.table(goGseDf, file ="tables/GO_gsea.tsv",sep="\t",row.names=FALSE)
+
+###########################
+### autism gene sets ######
+###########################
+## via badoi
+lookfor= function(this,inThat) { #gene name matching
+  this = toupper(this); inThat = toupper(inThat);
+  tmp = sapply(this,function(x) grep(paste0('^',x,'$'),inThat))
+  return(sapply(tmp,function(x) ifelse(length(x)==0,NA,x[1])))}
+
+ensembl = useMart("ensembl",dataset = 'mmusculus_gene_ensembl')
+MMtoHG = getBM(attributes = c('ensembl_gene_id','hsapiens_homolog_ensembl_gene'),
+               mart = ensembl)
+
+## add mouse homologs
+outGeneSva$hsapien_homolog = MMtoHG$hsapiens_homolog_ensembl_gene[
+	match(outGeneSva$ensemblID,MMtoHG$ensembl_gene_id)]
+outGeneSva$sigColor = NULL 
+sigGene = outGeneSva[outGeneSva$adj.P.Val < 0.1,]
+
+########################
+# load SFARI human genes
+humanSFARI = read.csv('../gene_sets/SFARI-Gene_genes_05-06-2019release_05-16-2019export.csv')
+humanSFARI = cbind(humanSFARI,outGeneSva[lookfor(humanSFARI$gene.symbol,outGeneSva$Symbol),])
+humanSFARI= humanSFARI[!is.na(humanSFARI$Symbol),]
+humanSFARI = humanSFARI[!duplicated(humanSFARI),]
+nrow(humanSFARI) # 939 expressed in mouse cst bulk dataset
+
+#########################
+# load SFARI mouse models
+mouseSFARI = read.csv('../gene_sets/SFARI-Gene_animal-genes_05-06-2019release_05-16-2019export.csv')
+mouseSFARI = with(mouseSFARI,mouseSFARI[model.species=='Mus musculus',])
+mouseSFARI = cbind(mouseSFARI,outGeneSva[lookfor(mouseSFARI$gene.symbol,outGeneSva$Symbol),])
+mouseSFARI= mouseSFARI[!is.na(mouseSFARI$Symbol),]
+mouseSFARI = mouseSFARI[order(match(mouseSFARI$Symbol,humanSFARI$Symbol)),]
+mouseSFARI = mouseSFARI[!duplicated(mouseSFARI),]
+rownames(mouseSFARI) = mouseSFARI$Symbol
+nrow(mouseSFARI) # 238 expressed in mouse oxt dataset
+
+###########################
+# list of DEG in mouse SFARI
+outGeneSva$inMouseSFARI = outGeneSva$Symbol %in% mouseSFARI$Symbol
+(t1 = with(outGeneSva,table(inMouseSFARI,inDEG = adj.P.Val < 0.1)))
+fisher.test(t1) # OR = 5.861999 p-value = 0.05056
+ind1 = which(mouseSFARI$adj.P.Val < 0.1)
+mouseSFARI[ind1,]
+#######################################
+# list of DEG in scored human SFARI list
+# 131 human SFARI ASD-linked genes in our list of DEGs
+outGeneSva$inHumanSFARI =  toupper(outGeneSva$Symbol) %in% humanSFARI$gene.symbol
+outGeneSva_hs = outGeneSva[grep("^ENSG", outGeneSva$hsapien_homolog),]
+(t2 = with(outGeneSva_hs,table(inHumanSFARI,inDEG = adj.P.Val < 0.1)))
+fisher.test(t2) # OR = 1.768907, p-value = 0.4207
+ind2 = which(humanSFARI$adj.P.Val < 0.1)
+humanSFARI[ind2,]
+	
+# Bdnf, Grin2b, Ntrk3
+
+
