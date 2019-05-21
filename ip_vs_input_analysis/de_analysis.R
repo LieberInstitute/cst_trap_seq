@@ -122,6 +122,33 @@ goDf = goDf[order(goDf$pvalue),]
 write.csv(goDf, row.names=FALSE,
 	file="tables/GO_voomBonf_IPvsInput_signed.csv")
 
+#### plots #####
+goDf = read.csv("tables/GO_voomBonf_IPvsInput_signed.csv")
+
+setsToPlot = c("GO:0033267", "GO:0044306",
+	"GO:0042063", "GO:0050808","GO:0098918",
+	"GO:0051015", "GO:0021800", "GO:0005509",
+	"GO:0043209")
+	
+goExample = goDf[goDf$Cluster == "IP",]
+goExample = goExample[match(setsToPlot, goExample$ID),]	
+goDown = goDf[goDf$Cluster == "Input",]
+goExample$input_pAdj = goDown$p.adjust[match(goExample$ID, goDown$ID)]
+goExample$input_pAdj[is.na(goExample$input_pAdj)] = 1
+goExample = goExample[order(goExample$pvalue),]
+
+negFdrMat = -log10(as.matrix(goExample[,c("p.adjust", "input_pAdj")]))
+rownames(negFdrMat) = goExample$Description
+
+pdf("plots/go_figure2d_barplot_ipVsInput.pdf",h=4,w=7)
+par(mar=c(5,18,2,2),cex.axis=1.2,cex.lab=1.5)
+barplot(t(negFdrMat),width=0.5,# names = goExample$Description,
+	horiz=TRUE, beside=TRUE, col = 2:1,
+	xlab="-log10(FDR)",las=1)
+abline(v=-log10(0.05), col="blue")
+dev.off()
+
+
 ###############
 ### CSEA ######
 ###############

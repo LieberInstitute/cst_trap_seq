@@ -1,5 +1,4 @@
 ###
-
 library(SummarizedExperiment)
 library(readxl)
 library(jaffelab)
@@ -59,7 +58,6 @@ plot(pca$x, xlab=paste0("PC1: ", pcaVars[1], "% Var Expl"),
 plot(pca$x[,1] ~ rse_gene$totalAssignedGene) # definitely PC1
 plot(pca$x[,2] ~ rse_gene$mitoRate) #  PC2?
 plot(pca$x[,2] ~ rse_gene$KAPA_Conc) #  PC2? sample had highest chrM and highest KAPA
-plot(pca$x[,3] ~ totalY) #  PC2?
 
 ################
 ### genotypes ##
