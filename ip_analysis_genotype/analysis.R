@@ -10,6 +10,8 @@ library(clusterProfiler)
 library(org.Mm.eg.db)
 library(VariantAnnotation)
 library(RColorBrewer)
+library(biomaRt)
+library(readxl)
 
 dir.create("plots")
 dir.create("tables")
@@ -99,9 +101,14 @@ fitGene = lmFit(vGene)
 eBGene = eBayes(fitGene)
 outGene = topTable(eBGene,coef=2,
 	p.value = 1,number=nrow(rse_gene), sort="none")
+
+## label
 outGene$sigColor = as.numeric(outGene$adj.P.Val < 0.05)+1
+
 sigGene = outGene[outGene$adj.P.Val < 0.05,]
 sigGene = sigGene[order(sigGene$P.Value),]
+
+## write out
 statsOut = sigGene[,c(2,5, 8,10:13,3,1,4,6,9)]
 write.csv(statsOut, file = "tables/mutantVsWT_statistics_FDR05.csv",row.names=FALSE)
 write.csv(outGene[,c(2,5, 8,10:13,3,1,4,6,9)], 
@@ -183,7 +190,7 @@ goExample$Description[goExample$Description == "regulation of cation transmembra
 goExample$Description[goExample$Description == "positive regulation of neuron projection development"] = "positive regulation of\nneuron projection development"
 
 goExample$Label = paste0(goExample$ID, ": ", goExample$Description)
-pdf("plots/go_barplot.pdf",h=6,w=8)
+pdf("plots/figure3d_GO_barplot_ipGenotype.pdf",h=6,w=8)
 par(mar=c(5,21.5,1,1),cex.axis=1.2,cex.lab=1.5)
 barplot(t(-log10(as.matrix(goExample[,c("Up", "Down")]))),
 	width=0.75, names = goExample$Label,
@@ -193,11 +200,129 @@ abline(v=-log10(max(goOut$pvalue[goOut$p.adj < 0.05])), col="blue")
 legend("topright", c("Mut>Wt", "Mut<Wt"), col=c("blue","red"),
 	cex=1.2,nc=1,pch=15)
 dev.off()
-	
-goSub = go
-goSub@compareClusterResult = goSub@compareClusterResult[goSub@compareClusterResult$ID %in% goIDs,]
-goSub@compareClusterResult$ONTOLOGY = NULL
 
-pdf("plots/go_dotplot.pdf")
-dotplot(goSub)
-dev.off()
+###############
+### CSEA ######
+###############
+library(pSI)
+library(pSI.data)
+
+## weird i have to force this
+load("~/R/x86_64-pc-linux-gnu-library/3.5/pSI.data/data/mouse.rda")
+
+## run enrichment
+csea_IP = fisher.iteration(mouse$psi.out, outGene$Symbol[outGene$adj.P.Val < 0.05])
+write.csv(csea_IP, file = "tables/csea_enrichment_genotypeEffect_IPdata.csv")
+
+
+###########################
+### autism gene sets ######
+###########################
+## via badoi
+lookfor= function(this,inThat) { #gene name matching
+  this = toupper(this); inThat = toupper(inThat);
+  tmp = sapply(this,function(x) grep(paste0('^',x,'$'),inThat))
+  return(sapply(tmp,function(x) ifelse(length(x)==0,NA,x[1])))}
+
+ensembl = useMart("ensembl",dataset = 'mmusculus_gene_ensembl')
+MMtoHG = getBM(attributes = c('ensembl_gene_id','hsapiens_homolog_ensembl_gene'),
+               mart = ensembl)
+
+## add mouse homologs
+outGene$hsapien_homolog = MMtoHG$hsapiens_homolog_ensembl_gene[
+	match(outGene$ensemblID,MMtoHG$ensembl_gene_id)]
+outGene$sigColor = NULL 
+sigGene = outGene[outGene$adj.P.Val < 0.05,]
+
+########################
+# load SFARI human genes
+humanSFARI = read.csv('../gene_sets/SFARI-Gene_genes_05-06-2019release_05-16-2019export.csv')
+humanSFARI = cbind(humanSFARI,outGene[lookfor(humanSFARI$gene.symbol,outGene$Symbol),])
+humanSFARI= humanSFARI[!is.na(humanSFARI$Symbol),]
+humanSFARI = humanSFARI[!duplicated(humanSFARI),]
+nrow(humanSFARI) # 917 expressed in mouse cst ip dataset
+
+#########################
+# load SFARI mouse models
+mouseSFARI = read.csv('../gene_sets/SFARI-Gene_animal-genes_05-06-2019release_05-16-2019export.csv')
+mouseSFARI = with(mouseSFARI,mouseSFARI[model.species=='Mus musculus',])
+mouseSFARI = cbind(mouseSFARI,outGene[lookfor(mouseSFARI$gene.symbol,outGene$Symbol),])
+mouseSFARI= mouseSFARI[!is.na(mouseSFARI$Symbol),]
+mouseSFARI = mouseSFARI[order(match(mouseSFARI$Symbol,humanSFARI$Symbol)),]
+mouseSFARI = mouseSFARI[!duplicated(mouseSFARI),]
+rownames(mouseSFARI) = mouseSFARI$Symbol
+nrow(mouseSFARI) # 237 expressed in mouse oxt dataset
+
+###########################
+# list of DEG in mouse SFARI
+outGene$inMouseSFARI = outGene$Symbol %in% mouseSFARI$Symbol
+(t1 = with(outGene,table(inMouseSFARI,inDEG = adj.P.Val < 0.05)))
+fisher.test(t1) # OR = 6.022539,  p-value = 6.845e-12
+ind1 = which(mouseSFARI$adj.P.Val < 0.05)
+rownames(mouseSFARI[ind1,])
+ # [1] "App"     "Atp1a3"  "Bdnf"    "Clstn3"  "Cntnap2" "Crhr2"   "Dlgap1"
+ # [8] "Dpp6"    "Dscam"   "Erbb4"   "Gad1"    "Grin2b"  "Grpr"    "Kirrel3"
+# [15] "Mef2c"   "Nrg1"    "Pcdh19"  "Reln"    "Rims1"   "Pvalb"   "Slc6a1"
+# [22] "Slc9a6"  "Srrm4"   "St8sia2" "Tcf4"    "Trpc6"
+
+#######################################
+# list of DEG in scored human SFARI list
+outGene$inHumanSFARI =  toupper(outGene$Symbol) %in% humanSFARI$gene.symbol
+outGene_hs = outGene[grep("^ENSG", outGene$hsapien_homolog),]
+(t2 = with(outGene_hs,table(inHumanSFARI,inDEG = adj.P.Val < 0.05)))
+fisher.test(t2) # OR = 2.784823, p-value = 3.057e-11
+ind2 = which(humanSFARI$adj.P.Val < 0.05)
+humanSFARI[ind2,"Symbol"]
+ # [1] "Ace"      "Ache"     "Adarb1"   "Arhgap15" "Arhgap5"  "Abat"
+ # [7] "App"      "Atp1a3"   "Bdnf"     "Clstn3"   "Cnr1"     "Cntnap2"
+# [13] "Cntnap3"  "Crhr2"    "Dip2a"    "Dlgap1"   "Dlgap2"   "Dpp10"
+# [19] "Dpp6"     "Dpysl2"   "Dscam"    "Erbb4"    "Fat1"     "Fam135b"
+# [25] "Gabbr2"   "Gad1"     "Gria1"    "Grin2b"   "Grpr"     "Il1rapl2"
+# [31] "Kcnc1"    "Kirrel3"  "Lamb1"    "Mapk3"    "Lpl"      "Mef2c"
+# [37] "Mcc"      "Nos1ap"   "Ntrk2"    "Ntrk3"    "Nxph1"    "Nrg1"
+# [43] "Pcdh19"   "Pcdh8"    "Plxna4"   "Ptprt"    "Reln"     "Rims1"
+# [49] "Robo1"    "Pcdhac1"  "Pcdhac2"  "Pvalb"    "Rit2"     "Sez6l2"
+# [55] "Sik1"     "Slc6a1"   "Slc9a6"   "Smarca2"  "Snap25"   "Snx14"
+# [61] "Sparcl1"  "Srrm4"    "St8sia2"  "Syt1"     "Tcf4"     "Trpc6"
+
+#######################
+### other DX ##########
+#######################
+library(biomaRt)
+ensembl = useMart("ENSEMBL_MART_ENSEMBL",  
+	dataset="hsapiens_gene_ensembl", host="jul2016.archive.ensembl.org")
+sym = getBM(attributes = c("ensembl_gene_id","hgnc_symbol","entrezgene"), 
+		values=outGene$hsapien_homolog, mart=ensembl)
+outGene$hsapien_EntrezID = sym$entrezgene[match(outGene$hsapien_homolog, sym$ensembl_gene_id)]
+
+dxSets = read.delim("../gene_sets/Harmonizome_CTD Gene-Disease Associations Dataset.txt",
+	as.is=TRUE,skip=1)
+dxSets$isExpMouse = dxSets$GeneID %in% outGene$hsapien_EntrezID
+dxSets$CST_enrich_Mouse = dxSets$GeneID %in% outGene$hsapien_EntrezID[
+	outGene$adj.P.Val <0.05]
+	
+## split
+dxSetsList = split(dxSets, dxSets$Disease)
+dxSetsList = dxSetsList[sapply(dxSetsList, function(x) sum(x$CST_enrich_Mouse) > 0)]
+length(dxSetsList)
+univ = outGene[order(outGene$P.Value),]
+univ = univ[!is.na(univ$hsapien_EntrezID),]
+univ = univ[!duplicated(univ$hsapien_EntrezID),]
+univ$CST_Geno = univ$adj.P.Val < 0.05 
+
+dxStats = do.call("rbind", mclapply(dxSetsList, function(x) {
+	x = x[x$isExpMouse,]
+	inSet = univ$hsapien_EntrezID %in% x$GeneID
+	tt = table(inSet, univ$CST_Geno)
+	data.frame(OR = getOR(tt), p.value = chisq.test(tt)$p.value)
+},mc.cores=4))
+	
+dxStats = dxStats[order(dxStats$p.value),]
+dxStats$setSize = sapply(dxSetsList,nrow)[rownames(dxStats)]
+dxStats$numSig= sapply(dxSetsList,function(x) sum(x$CST_enrich_Mouse))[rownames(dxStats)]
+dxStats$ID = dxSets$Mesh.or.Omim.ID[match(rownames(dxStats), dxSets$Disease)]
+
+dxStats$sigGenes = sapply(dxSetsList,
+	function(x) paste0(x$GeneSym[x$CST_enrich_Mouse], collapse=";"))[rownames(dxStats)]
+
+write.csv(dxStats, "tables/Harmonizome_CST_IP-Genotype_effects.csv")
