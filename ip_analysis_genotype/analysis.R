@@ -288,7 +288,7 @@ humanSFARI[ind2,"Symbol"]
 #######################
 ### other DX ##########
 #######################
-library(biomaRt)
+
 ensembl = useMart("ENSEMBL_MART_ENSEMBL",  
 	dataset="hsapiens_gene_ensembl", host="jul2016.archive.ensembl.org")
 sym = getBM(attributes = c("ensembl_gene_id","hgnc_symbol","entrezgene"), 
@@ -316,7 +316,8 @@ dxStats = do.call("rbind", mclapply(dxSetsList, function(x) {
 	tt = table(inSet, univ$CST_Geno)
 	data.frame(OR = getOR(tt), p.value = chisq.test(tt)$p.value)
 },mc.cores=4))
-	
+
+dxStats$adj.P.Val = p.adjust(dxStats$p.value)
 dxStats = dxStats[order(dxStats$p.value),]
 dxStats$setSize = sapply(dxSetsList,nrow)[rownames(dxStats)]
 dxStats$numSig= sapply(dxSetsList,function(x) sum(x$CST_enrich_Mouse))[rownames(dxStats)]
