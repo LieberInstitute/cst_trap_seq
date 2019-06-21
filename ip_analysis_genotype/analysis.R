@@ -81,6 +81,8 @@ table(rowSums(is.na(snpsGeno))) # revisit
 
 exprsIndex = rowMeans(getRPKM(rse_gene,"Length")) > 0.1
 rse_gene = rse_gene[exprsIndex,]
+nrow(rse_gene)
+
 
 ## modeling
 mod = model.matrix(~Genotype + totalAssignedGene, 

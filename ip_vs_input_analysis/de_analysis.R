@@ -37,6 +37,7 @@ boxplot(rse_gene$overallMapRate ~rse_gene$Fraction ) # no assoc
 
 ## GENE
 rse_gene_filter = rse_gene[rowMeans(getRPKM(rse_gene, "Length")) > 0.1,]
+nrow(rse_gene_filter) # 21776
 mod = model.matrix(~Fraction+overallMapRate,
 	data = colData(rse_gene_filter))
 	

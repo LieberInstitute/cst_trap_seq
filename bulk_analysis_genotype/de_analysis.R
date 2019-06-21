@@ -61,6 +61,7 @@ myplclust(hclust(dd),lab.col = as.numeric(rse_gene$Genotype))
 
 ## GENE
 rse_gene_filter = rse_gene[rowMeans(getRPKM(rse_gene, "Length")) > 0.1,]
+nrow(rse_gene_filter) # 21717
 mod = model.matrix(~Genotype+totalAssignedGene+mitoRate,
 	data = colData(rse_gene_filter))
 	
@@ -98,7 +99,7 @@ sum(outGeneSva$P.Value < 0.005)
 
 sigGeneSva = topTable(ebGeneSva, coef=2,
 	p.value = 0.2, n = nrow(dge))
-
+table(abs(sigGeneSva$logFC[sigGeneSva$adj.P.Val < 0.1]) > 1)
 write.csv(outGeneSva, file = "tables/all_genes_voom_sva_trkB_CST.csv")
 write.csv(sigGeneSva, file = "tables/de_genes_voom_sva_trkB_CST_fdr20.csv")
 
@@ -137,33 +138,6 @@ go <- compareCluster(sigGene, fun = "enrichGO",
                 pvalueCutoff  = 1, qvalueCutoff  = 1,
 				readable= TRUE)
 
-## make plots
-setsToPlot = c("GO:0015085", "GO:0008066", "GO:0005231", 
-	"GO:0072578", "GO:0050918", "GO:0017156",
-	"GO:0042391", "GO:0097060" ,"GO:0098978",
-	"GO:0044306", "GO:0031012")
-
-goDf = read.csv("tables/GO_voomBonf_IPvsInput_signed.csv")
-
-goExample = goDf[goDf$Cluster == "IP",]
-goExample = goExample[match(setsToPlot, goExample$ID),]	
-goDown = goDf[goDf$Cluster == "Input",]
-goExample$input_pAdj = goDown$p.adjust[match(goExample$ID, goDown$ID)]
-goExample$input_pAdj[is.na(goExample$input_pAdj)] = 1
-goExample = goExample[order(goExample$pvalue),]
-
-negFdrMat = -log10(as.matrix(goExample[,c("p.adjust", "input_pAdj")]))
-rownames(negFdrMat) = goExample$Description
-
-pdf("plots/go_figure2d_barplot_ipVsInput.pdf",h=4,w=7)
-par(mar=c(5,18,2,2),cex.axis=1.2,cex.lab=1.5)
-barplot(t(negFdrMat),width=0.5,# names = goExample$Description,
-	horiz=TRUE, beside=TRUE, col = 2:1,
-	xlab="-log10(FDR)",las=1)
-abline(v=-log10(0.05), col="blue")
-dev.off()
-
-	
 ##########
 ## gsea ## 
 geneStat = outGeneSva$t
@@ -210,6 +184,33 @@ write.table(keggGseDf, file ="tables/KEGG_gsea.tsv",
 	sep="\t",row.names=FALSE)
 write.table(goGseDf, file ="tables/GO_gsea.tsv",sep="\t",row.names=FALSE)
 
+######################
+## make plots
+setsToPlot = c("GO:0015085", "GO:0008066", "GO:0005231", 
+	"GO:0072578", "GO:0050918", "GO:0017156",
+	"GO:0042391", "GO:0097060" ,"GO:0098978",
+	"GO:0044306", "GO:0031012")
+
+goDf = read.csv("tables/bulk_genotype_GOsets_hypergeo_Gene-p005.csv")
+goExample = goDf[goDf$Cluster == "CST<WT",]
+goExample = goExample[match(setsToPlot, goExample$ID),]	
+goUp = goDf[goDf$Cluster == "WT<CST",]
+goExample$up_pAdj = goUp$p.adjust[match(goExample$ID, goUp$ID)]
+goExample$up_pAdj[is.na(goExample$up_pAdj)] = 1
+goExample = goExample[order(goExample$pvalue),]
+
+negFdrMat = -log10(as.matrix(goExample[,c("p.adjust", "up_pAdj")]))
+rownames(negFdrMat) = goExample$Description
+
+pdf("plots/go_figure2c_barplot_GenotypeInBulk.pdf",h=4,w=8.5)
+par(mar=c(5,26,2,2),cex.axis=1.2,cex.lab=1.5)
+barplot(t(negFdrMat),width=0.5,# names = goExample$Description,
+	horiz=TRUE, beside=TRUE, col = 2:1,
+	xlab="-log10(FDR)",las=1)
+abline(v=-log10(0.05), col="blue")
+dev.off()
+
+	
 ###########################
 ### autism gene sets ######
 ###########################
