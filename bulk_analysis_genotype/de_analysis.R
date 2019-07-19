@@ -103,6 +103,10 @@ table(abs(sigGeneSva$logFC[sigGeneSva$adj.P.Val < 0.1]) > 1)
 write.csv(outGeneSva, file = "tables/all_genes_voom_sva_trkB_CST.csv")
 write.csv(sigGeneSva, file = "tables/de_genes_voom_sva_trkB_CST_fdr20.csv")
 
+### numbers for the paper
+sum(outGeneSva$adj.P.Val < 0.1)
+sum(outGeneSva$adj.P.Val < 0.1 & abs(outGeneSva$logFC) > 1)
+
 ####################
 ## volcano	plot ###
 outGeneSva$sigColor = as.numeric(outGeneSva$adj.P.Val < 0.1)+1
@@ -267,5 +271,54 @@ ind2 = which(humanSFARI$adj.P.Val < 0.1)
 humanSFARI[ind2,]
 	
 # Bdnf, Grin2b, Ntrk3
+save(mouseSFARI, humanSFARI, file = "tables/SFARI_annotated_results.rda")
+
+
+
+#######################
+### other DX ##########
+#######################
+library(biomaRt)
+ensembl = useMart("ENSEMBL_MART_ENSEMBL",  
+	dataset="hsapiens_gene_ensembl", host="jul2016.archive.ensembl.org")
+sym = getBM(attributes = c("ensembl_gene_id","hgnc_symbol","entrezgene"), 
+		values=outGeneSva$hsapien_homolog, mart=ensembl)
+outGeneSva$hsapien_EntrezID = sym$entrezgene[match(outGeneSva$hsapien_homolog, sym$ensembl_gene_id)]
+
+dxSets = read.delim("../gene_sets/Harmonizome_CTD Gene-Disease Associations Dataset.txt",
+	as.is=TRUE,skip=1)
+dxSets$isExpMouse = dxSets$GeneID %in% outGeneSva$hsapien_EntrezID
+dxSets$enrich_Mouse = dxSets$GeneID %in% outGeneSva$hsapien_EntrezID[
+	outGeneSva$adj.P.Val <0.05]
+	
+## split
+dxSetsList = split(dxSets, dxSets$Disease)
+dxSetsList = dxSetsList[sapply(dxSetsList, function(x) sum(x$enrich_Mouse) > 0)]
+length(dxSetsList)
+univ = outGeneSva[order(outGeneSva$P.Value),]
+univ = univ[!is.na(univ$hsapien_EntrezID),]
+univ = univ[!duplicated(univ$hsapien_EntrezID),]
+univ$CST = univ$adj.P.Val < 0.1
+
+dxStats = do.call("rbind", mclapply(dxSetsList, function(x) {
+	x = x[x$isExpMouse,]
+	inSet = univ$hsapien_EntrezID %in% x$GeneID
+	tt = table(inSet, univ$CST)
+	data.frame(OR = getOR(tt), p.value = chisq.test(tt)$p.value)
+},mc.cores=4))
+	
+dxStats = dxStats[order(dxStats$p.value),]
+
+### more metrics
+dxStats$adj.P.Val = p.adjust(dxStats$p.value)
+dxStats = dxStats[order(dxStats$p.value),]
+dxStats$setSize = sapply(dxSetsList,nrow)[rownames(dxStats)]
+dxStats$numSig= sapply(dxSetsList,function(x) sum(x$enrich_Mouse))[rownames(dxStats)]
+dxStats$ID = dxSets$Mesh.or.Omim.ID[match(rownames(dxStats), dxSets$Disease)]
+
+dxStats$sigGenes = sapply(dxSetsList,
+	function(x) paste0(x$GeneSym[x$enrich_Mouse], collapse=";"))[rownames(dxStats)]
+
+write.csv(dxStats, "tables/Harmonizome_CTD-Dx_CST_bulk_effects.csv")
 
 

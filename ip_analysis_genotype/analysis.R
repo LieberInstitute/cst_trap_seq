@@ -81,7 +81,7 @@ table(rowSums(is.na(snpsGeno))) # revisit
 
 exprsIndex = rowMeans(getRPKM(rse_gene,"Length")) > 0.1
 rse_gene = rse_gene[exprsIndex,]
-nrow(rse_gene)
+nrow(rse_gene) # 21187
 
 
 ## modeling
@@ -117,7 +117,9 @@ write.csv(outGene[,c(2,5, 8,10:13,3,1,4,6,9)],
 	file = gzfile("tables/mutantVsWT_statistics_all.csv.gz"),row.names=FALSE)
 save(outGene, file="tables/mutantVsWT_statistics_all.rda")
 
+## num signif
 dim(sigGene)
+table(abs(sigGene$logFC) > 1)
 
 #######
 ## volanco plot
@@ -234,7 +236,6 @@ MMtoHG = getBM(attributes = c('ensembl_gene_id','hsapiens_homolog_ensembl_gene')
 outGene$hsapien_homolog = MMtoHG$hsapiens_homolog_ensembl_gene[
 	match(outGene$ensemblID,MMtoHG$ensembl_gene_id)]
 outGene$sigColor = NULL 
-sigGene = outGene[outGene$adj.P.Val < 0.05,]
 
 ########################
 # load SFARI human genes
@@ -261,7 +262,7 @@ outGene$inMouseSFARI = outGene$Symbol %in% mouseSFARI$Symbol
 (t1 = with(outGene,table(inMouseSFARI,inDEG = adj.P.Val < 0.05)))
 fisher.test(t1) # OR = 6.022539,  p-value = 6.845e-12
 ind1 = which(mouseSFARI$adj.P.Val < 0.05)
-rownames(mouseSFARI[ind1,])
+rownames(mouseSFARI[ind1,]) # 26 genes
  # [1] "App"     "Atp1a3"  "Bdnf"    "Clstn3"  "Cntnap2" "Crhr2"   "Dlgap1"
  # [8] "Dpp6"    "Dscam"   "Erbb4"   "Gad1"    "Grin2b"  "Grpr"    "Kirrel3"
 # [15] "Mef2c"   "Nrg1"    "Pcdh19"  "Reln"    "Rims1"   "Pvalb"   "Slc6a1"
@@ -286,6 +287,7 @@ humanSFARI[ind2,"Symbol"]
 # [49] "Robo1"    "Pcdhac1"  "Pcdhac2"  "Pvalb"    "Rit2"     "Sez6l2"
 # [55] "Sik1"     "Slc6a1"   "Slc9a6"   "Smarca2"  "Snap25"   "Snx14"
 # [61] "Sparcl1"  "Srrm4"    "St8sia2"  "Syt1"     "Tcf4"     "Trpc6"
+save(mouseSFARI, humanSFARI, file = "tables/SFARI_annotated_results.rda")
 
 #######################
 ### other DX ##########

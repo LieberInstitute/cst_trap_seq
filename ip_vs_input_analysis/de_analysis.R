@@ -61,6 +61,7 @@ sum(outGene$adj.P.Val < 0.05) ## 5362
 outGene$Bonf = p.adjust(outGene$P.Value, "bonf")
 sum(outGene$Bonf < 0.05) ## 868
 
+table(abs(outGene$logFC[outGene$Bonf < 0.05]) > 1)
 write.csv(outGene, file = "tables/all_genes_voom_CST_IPvsInput_lmer.csv")
 
 ####################
@@ -177,7 +178,6 @@ MMtoHG = getBM(attributes = c('ensembl_gene_id','hsapiens_homolog_ensembl_gene')
 outGene$hsapien_homolog = MMtoHG$hsapiens_homolog_ensembl_gene[
 	match(outGene$ensemblID,MMtoHG$ensembl_gene_id)]
 outGene$sigColor = NULL 
-sigGene = outGene[outGene$adj.P.Val < 0.1,]
 
 ########################
 # load SFARI human genes
@@ -204,7 +204,7 @@ outGene$inMouseSFARI = outGene$Symbol %in% mouseSFARI$Symbol
 (t1 = with(outGene,table(inMouseSFARI,inDEG = Bonf < 0.05 & logFC > 0)))
 fisher.test(t1) # OR = 6.340408 p-value = 9.247e-13
 ind1 = which(mouseSFARI$Bonf < 0.05 & mouseSFARI$logFC > 0)
-mouseSFARI[ind1,]
+nrow(mouseSFARI[ind1,])
 
 #######################################
 # list of DEG in scored human SFARI list
@@ -214,7 +214,9 @@ outGene_hs = outGene[grep("^ENSG", outGene$hsapien_homolog),]
 fisher.test(t2) # OR = 4.175872, p-value = 9.026209e-25
 ind2 = which(humanSFARI$Bonf < 0.05 & humanSFARI$logFC > 0)
 humanSFARI[ind2,]
-	
+nrow(humanSFARI[ind2,])
+save(mouseSFARI, humanSFARI, file = "tables/SFARI_annotated_results.rda")
+
 #######################
 ### other DX ##########
 #######################
