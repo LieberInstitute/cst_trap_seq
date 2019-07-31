@@ -9,7 +9,7 @@ dir.create("supp_tables/")
 files = c(Bulk_DE = "bulk_analysis_genotype/tables/all_genes_voom_sva_trkB_CST.csv",
 	Bulk_GO = "bulk_analysis_genotype/tables/bulk_genotype_GOsets_hypergeo_Gene-p005.csv",
 	IPvsInput_DE = "ip_vs_input_analysis/tables/all_genes_voom_CST_IPvsInput_lmer.csv",
-	IPvsInput_GO = "ip_vs_input_analysis/tables/all_genes_voom_CST_IPvsInput_lmer.csv",
+	IPvsInput_GO = "ip_vs_input_analysis/tables/GO_voomBonf_IPvsInput_signed.csv",
 	IP_Geno_DE = "ip_analysis_genotype/tables/mutantVsWT_statistics_all.csv.gz",
 	IP_Geno_GO = "ip_analysis_genotype/tables/mutVsWt_GO_FDR05.csv")
 	
