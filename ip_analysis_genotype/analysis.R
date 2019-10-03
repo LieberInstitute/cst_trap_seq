@@ -186,24 +186,26 @@ goPlot = goOut[goOut$ID %in% goIDs,]
 
 goExample = goPlot[!duplicated(goPlot[,c("ID", "Description")]),3:4]
 upGo = goPlot[goPlot$Cluster == 1,]
-goExample$Up = upGo$pvalue[match(goExample$ID, upGo$ID)]
+goExample$Up = upGo$p.adjust[match(goExample$ID, upGo$ID)]
 downGo = goPlot[goPlot$Cluster == -1,]
-goExample$Down = downGo$pvalue[match(goExample$ID, downGo$ID)]
+goExample$Down = downGo$p.adjust[match(goExample$ID, downGo$ID)]
 
 goExample$Description[goExample$Description == "regulation of cation transmembrane transport"] = "regulation of cation\ntransmembrane transport"
 goExample$Description[goExample$Description == "positive regulation of neuron projection development"] = "positive regulation of\nneuron projection development"
 
-goExample$Label = paste0(goExample$ID, ": ", goExample$Description)
-pdf("plots/figure3d_GO_barplot_ipGenotype.pdf",h=6,w=8)
+goExample$Label = paste0(goExample$Description)
+
+pdf("plots/figure3d_GO_barplot_ipGenotype.pdf",h=6,w=10)
 par(mar=c(5,21.5,1,1),cex.axis=1.2,cex.lab=1.5)
 barplot(t(-log10(as.matrix(goExample[,c("Up", "Down")]))),
 	width=0.75, names = goExample$Label,
-	horiz=TRUE,xlim=c(0,8),ylim=c(0.5,23.5),
-	xlab="-log10(P-Value)",las=1,beside=TRUE, col=c("blue","red"))
-abline(v=-log10(max(goOut$pvalue[goOut$p.adj < 0.05])), col="blue")
-legend("topright", c("Mut>Wt", "Mut<Wt"), col=c("blue","red"),
+	horiz=TRUE,xlim=c(0,6),ylim=c(0.5,23.5),
+	xlab="-log10(FDR)",las=1,beside=TRUE, col=c("red","black"))
+abline(v=-log10(0.05), col="blue")
+legend("topright", c(expression(Cort^{Cre}~";"~TrkB^{flox/flox}~"<"~Control), expression(Cort^{Cre}~";"~TrkB^{flox/flox}~">"~Control)), col=c("black","red"),
 	cex=1.2,nc=1,pch=15)
 dev.off()
+
 
 ###############
 ### CSEA ######
