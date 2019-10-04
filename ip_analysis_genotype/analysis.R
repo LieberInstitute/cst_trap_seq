@@ -273,6 +273,11 @@ rownames(mouseSFARI[ind1,]) # 26 genes
 #######################################
 # list of DEG in scored human SFARI list
 outGene$inHumanSFARI =  toupper(outGene$Symbol) %in% humanSFARI$gene.symbol
+outGene$inHumanSFARI_stringent =  toupper(outGene$Symbol) %in%
+	humanSFARI$gene.symbol[humanSFARI$gene.score <= 2 | humanSFARI$syndromic == 1]
+outGene$inHumanSFARI_stringent_nonSyn =  toupper(outGene$Symbol) %in%
+	humanSFARI$gene.symbol[humanSFARI$gene.score <= 2 ]
+
 outGene_hs = outGene[grep("^ENSG", outGene$hsapien_homolog),]
 (t2 = with(outGene_hs,table(inHumanSFARI,inDEG = adj.P.Val < 0.05)))
 fisher.test(t2) # OR = 2.784823, p-value = 3.057e-11
@@ -289,6 +294,13 @@ humanSFARI[ind2,"Symbol"]
 # [49] "Robo1"    "Pcdhac1"  "Pcdhac2"  "Pvalb"    "Rit2"     "Sez6l2"
 # [55] "Sik1"     "Slc6a1"   "Slc9a6"   "Smarca2"  "Snap25"   "Snx14"
 # [61] "Sparcl1"  "Srrm4"    "St8sia2"  "Syt1"     "Tcf4"     "Trpc6"
+
+(t3 = with(outGene_hs,table(inHumanSFARI_stringent,inDEG = adj.P.Val < 0.05)))
+fisher.test(t3) # OR = 2.834305, p-value = 0.0019
+
+(t4 = with(outGene_hs,table(inHumanSFARI_stringent_nonSyn,inDEG = adj.P.Val < 0.05)))
+fisher.test(t4) # OR = 2.682013, p-value = 0.021
+
 save(mouseSFARI, humanSFARI, file = "tables/SFARI_annotated_results.rda")
 
 #######################

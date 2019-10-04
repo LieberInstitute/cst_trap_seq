@@ -209,12 +209,27 @@ nrow(mouseSFARI[ind1,])
 #######################################
 # list of DEG in scored human SFARI list
 outGene$inHumanSFARI =  toupper(outGene$Symbol) %in% humanSFARI$gene.symbol
+outGene$inHumanSFARI_stringent =  toupper(outGene$Symbol) %in%
+	humanSFARI$gene.symbol[humanSFARI$gene.score <= 2 | humanSFARI$syndromic == 1]
+outGene$inHumanSFARI_stringent_nonSyn =  toupper(outGene$Symbol) %in%
+	humanSFARI$gene.symbol[humanSFARI$gene.score <= 2 ]
+
+	
 outGene_hs = outGene[grep("^ENSG", outGene$hsapien_homolog),]
 (t2 = with(outGene_hs,table(inHumanSFARI,inDEG = Bonf < 0.05 & logFC > 0)))
 fisher.test(t2) # OR = 4.175872, p-value = 9.026209e-25
 ind2 = which(humanSFARI$Bonf < 0.05 & humanSFARI$logFC > 0)
 humanSFARI[ind2,]
 nrow(humanSFARI[ind2,])
+
+(t3 = with(outGene_hs,table(inHumanSFARI_stringent,inDEG = Bonf < 0.05 & logFC > 0)))
+fisher.test(t3) # OR = 5.712584, p-value = 8.973e-14
+
+(t4 = with(outGene_hs,table(inHumanSFARI_stringent_nonSyn,inDEG = Bonf < 0.05 & logFC > 0)))
+fisher.test(t4) # OR =6.553073, p-value = 8.057e-08
+
+
+
 save(mouseSFARI, humanSFARI, file = "tables/SFARI_annotated_results.rda")
 
 #######################
